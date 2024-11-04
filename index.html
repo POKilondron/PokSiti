@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Style Controls</title>
+    <title>PokSiti</title>
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
@@ -12,10 +12,13 @@
 <body>
     <script type="module">
         import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js';
+        import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
 
-        // Создаем сцену
+        // Сцена и физический мир
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Цвет неба
+        scene.background = new THREE.Color(0x87ceeb);
+        const world = new CANNON.World();
+        world.gravity.set(0, -9.82, 0); // Гравитация
 
         // Камера
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -29,25 +32,52 @@
         // Свет
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
-        
+
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
         directionalLight.position.set(5, 10, 7.5);
         scene.add(directionalLight);
 
-        // Плоскость земли
-        const planeGeometry = new THREE.PlaneGeometry(100, 100);
-        const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
-        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-        plane.rotation.x = -Math.PI / 2;
-        scene.add(plane);
+        // Земля (блоки)
+        const blockSize = 1;
+        const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+        for (let x = -10; x <= 10; x++) {
+            for (let z = -10; z <= 10; z++) {
+                const block = new THREE.Mesh(new THREE.BoxGeometry(blockSize, blockSize, blockSize), groundMaterial);
+                block.position.set(x * blockSize, -0.5, z * blockSize);
+                scene.add(block);
 
-        // Скорость перемещения и вращения
+                // Физика для блоков земли
+                const blockBody = new CANNON.Body({
+                    mass: 0, // Неподвижные
+                    shape: new CANNON.Box(new CANNON.Vec3(blockSize / 2, blockSize / 2, blockSize / 2))
+                });
+                blockBody.position.set(x * blockSize, -0.5, z * blockSize);
+                world.addBody(blockBody);
+            }
+        }
+
+        // Создание мобов (примитивные кубы)
+        const mobMaterial = new THREE.MeshStandardMaterial({ color: 0xff6347 });
+        const mobs = [];
+        for (let i = 0; i < 5; i++) {
+            const mob = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mobMaterial);
+            mob.position.set(Math.random() * 10 - 5, 1, Math.random() * 10 - 5);
+            scene.add(mob);
+
+            const mobBody = new CANNON.Body({
+                mass: 1, // Подвижные
+                shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)),
+                position: new CANNON.Vec3(mob.position.x, mob.position.y, mob.position.z)
+            });
+            world.addBody(mobBody);
+
+            mobs.push({ mesh: mob, body: mobBody });
+        }
+
+        // Управление камерой
         const moveSpeed = 0.1;
-        const rotationSpeed = 0.002;
-        let rotationX = 0;
-        let rotationY = 0;
+        let rotationX = 0, rotationY = 0;
 
-        // Управление клавишами
         const keys = {
             KeyW: false,
             KeyA: false,
@@ -63,7 +93,6 @@
             if (keys.hasOwnProperty(event.code)) keys[event.code] = false;
         });
 
-        // Pointer Lock для захвата мыши
         document.body.addEventListener('click', () => {
             document.body.requestPointerLock();
         });
@@ -77,12 +106,12 @@
         });
 
         function onMouseMove(event) {
-            rotationY -= event.movementX * rotationSpeed;
-            rotationX -= event.movementY * rotationSpeed;
-            rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX)); // Ограничение вращения по вертикали
+            rotationY -= event.movementX * 0.002;
+            rotationX -= event.movementY * 0.002;
+            rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX));
         }
 
-        // Функция движения
+        // Перемещение игрока
         function movePlayer() {
             const direction = new THREE.Vector3();
 
@@ -110,15 +139,24 @@
 
             movePlayer();
 
-            // Обновляем положение камеры на основе вращения
+            // Обновляем положение и вращение камеры
             camera.rotation.set(rotationX, rotationY, 0);
+
+            // Обновление физического мира
+            world.step(1 / 60);
+
+            // Обновляем позиции и вращения мобов
+            mobs.forEach(({ mesh, body }) => {
+                mesh.position.copy(body.position);
+                mesh.quaternion.copy(body.quaternion);
+            });
 
             renderer.render(scene, camera);
         }
 
         animate();
 
-        // Обработка изменения размера окна
+        // Изменение размера окна
         window.addEventListener('resize', () => {
             renderer.setSize(window.innerWidth, window.innerHeight);
             camera.aspect = window.innerWidth / window.innerHeight;
