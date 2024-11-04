@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Style Controls</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js';
+
+        // Создаем сцену
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Цвет неба
+
+        // Камера
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 2, 5);
+
+        // Рендерер
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Свет
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7.5);
+        scene.add(directionalLight);
+
+        // Плоскость земли
+        const planeGeometry = new THREE.PlaneGeometry(100, 100);
+        const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        plane.rotation.x = -Math.PI / 2;
+        scene.add(plane);
+
+        // Скорость перемещения и вращения
+        const moveSpeed = 0.1;
+        const rotationSpeed = 0.002;
+        let rotationX = 0;
+        let rotationY = 0;
+
+        // Управление клавишами
+        const keys = {
+            KeyW: false,
+            KeyA: false,
+            KeyS: false,
+            KeyD: false,
+        };
+
+        window.addEventListener('keydown', (event) => {
+            if (keys.hasOwnProperty(event.code)) keys[event.code] = true;
+        });
+
+        window.addEventListener('keyup', (event) => {
+            if (keys.hasOwnProperty(event.code)) keys[event.code] = false;
+        });
+
+        // Pointer Lock для захвата мыши
+        document.body.addEventListener('click', () => {
+            document.body.requestPointerLock();
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement === document.body) {
+                document.addEventListener('mousemove', onMouseMove, false);
+            } else {
+                document.removeEventListener('mousemove', onMouseMove, false);
+            }
+        });
+
+        function onMouseMove(event) {
+            rotationY -= event.movementX * rotationSpeed;
+            rotationX -= event.movementY * rotationSpeed;
+            rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX)); // Ограничение вращения по вертикали
+        }
+
+        // Функция движения
+        function movePlayer() {
+            const direction = new THREE.Vector3();
+
+            if (keys.KeyW) {
+                direction.set(Math.sin(rotationY), 0, Math.cos(rotationY));
+                camera.position.addScaledVector(direction, moveSpeed);
+            }
+            if (keys.KeyS) {
+                direction.set(-Math.sin(rotationY), 0, -Math.cos(rotationY));
+                camera.position.addScaledVector(direction, moveSpeed);
+            }
+            if (keys.KeyA) {
+                direction.set(Math.sin(rotationY + Math.PI / 2), 0, Math.cos(rotationY + Math.PI / 2));
+                camera.position.addScaledVector(direction, moveSpeed);
+            }
+            if (keys.KeyD) {
+                direction.set(Math.sin(rotationY - Math.PI / 2), 0, Math.cos(rotationY - Math.PI / 2));
+                camera.position.addScaledVector(direction, moveSpeed);
+            }
+        }
+
+        // Анимация
+        function animate() {
+            requestAnimationFrame(animate);
+
+            movePlayer();
+
+            // Обновляем положение камеры на основе вращения
+            camera.rotation.set(rotationX, rotationY, 0);
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Обработка изменения размера окна
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+    </script>
+</body>
+</html>
