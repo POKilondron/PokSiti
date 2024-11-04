@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Open World Survival Game</title>
+    <title>Minecraft Style Controls</title>
     <style>
-        body { margin: 0; }
+        body { margin: 0; overflow: hidden; }
         canvas { display: block; }
     </style>
 </head>
@@ -15,7 +15,7 @@
 
         // Создаем сцену
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // голубое небо
+        scene.background = new THREE.Color(0x87ceeb); // Цвет неба
 
         // Камера
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -41,47 +41,77 @@
         plane.rotation.x = -Math.PI / 2;
         scene.add(plane);
 
-        // Куб как объект игрока
-        const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const playerMaterial = new THREE.MeshStandardMaterial({ color: 0xff6347 });
-        const player = new THREE.Mesh(playerGeometry, playerMaterial);
-        player.position.y = 0.5;
-        scene.add(player);
-
-        // Скорость перемещения игрока
+        // Скорость перемещения и вращения
         const moveSpeed = 0.1;
+        const rotationSpeed = 0.002;
+        let rotationX = 0;
+        let rotationY = 0;
+
+        // Управление клавишами
         const keys = {
-            ArrowUp: false,
-            ArrowDown: false,
-            ArrowLeft: false,
-            ArrowRight: false,
+            KeyW: false,
+            KeyA: false,
+            KeyS: false,
+            KeyD: false,
         };
 
-        // Функции для отслеживания нажатия и отпускания клавиш
         window.addEventListener('keydown', (event) => {
-            if (keys.hasOwnProperty(event.key)) keys[event.key] = true;
+            if (keys.hasOwnProperty(event.code)) keys[event.code] = true;
         });
 
         window.addEventListener('keyup', (event) => {
-            if (keys.hasOwnProperty(event.key)) keys[event.key] = false;
+            if (keys.hasOwnProperty(event.code)) keys[event.code] = false;
         });
 
-        // Позиция камеры относительно игрока
-        const cameraOffset = new THREE.Vector3(0, 2, 5);
+        // Pointer Lock для захвата мыши
+        document.body.addEventListener('click', () => {
+            document.body.requestPointerLock();
+        });
 
-        // Функция анимации
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement === document.body) {
+                document.addEventListener('mousemove', onMouseMove, false);
+            } else {
+                document.removeEventListener('mousemove', onMouseMove, false);
+            }
+        });
+
+        function onMouseMove(event) {
+            rotationY -= event.movementX * rotationSpeed;
+            rotationX -= event.movementY * rotationSpeed;
+            rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX)); // Ограничение вращения по вертикали
+        }
+
+        // Функция движения
+        function movePlayer() {
+            const direction = new THREE.Vector3();
+
+            if (keys.KeyW) {
+                direction.set(Math.sin(rotationY), 0, Math.cos(rotationY));
+                camera.position.addScaledVector(direction, moveSpeed);
+            }
+            if (keys.KeyS) {
+                direction.set(-Math.sin(rotationY), 0, -Math.cos(rotationY));
+                camera.position.addScaledVector(direction, moveSpeed);
+            }
+            if (keys.KeyA) {
+                direction.set(Math.sin(rotationY + Math.PI / 2), 0, Math.cos(rotationY + Math.PI / 2));
+                camera.position.addScaledVector(direction, moveSpeed);
+            }
+            if (keys.KeyD) {
+                direction.set(Math.sin(rotationY - Math.PI / 2), 0, Math.cos(rotationY - Math.PI / 2));
+                camera.position.addScaledVector(direction, moveSpeed);
+            }
+        }
+
+        // Анимация
         function animate() {
             requestAnimationFrame(animate);
 
-            // Обновляем позицию игрока в зависимости от нажатых клавиш
-            if (keys.ArrowUp) player.position.z -= moveSpeed;
-            if (keys.ArrowDown) player.position.z += moveSpeed;
-            if (keys.ArrowLeft) player.position.x -= moveSpeed;
-            if (keys.ArrowRight) player.position.x += moveSpeed;
+            movePlayer();
 
-            // Перемещаем камеру за игроком
-            camera.position.copy(player.position).add(cameraOffset);
-            camera.lookAt(player.position); // Камера всегда смотрит на игрока
+            // Обновляем положение камеры на основе вращения
+            camera.rotation.set(rotationX, rotationY, 0);
 
             renderer.render(scene, camera);
         }
